@@ -1,0 +1,60 @@
+## Introduction
+This markdown file records me practicing using the **chAMP** package.  
+There are 8 samples being analyzed, which are cfDNA from 4 healthy volunteers and 4 lung cancer patients. The sentrix_ID is 205379740133, and all samples are included in it.
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+#### Loading and filtering data
+```{r}
+library(ChAMP)
+```
+```{r, cache=TRUE}
+myLoad <- champ.load(directory = "C:/InfiniumMeth/testsample/205379740133", arraytype = "EPIC")
+```
+
+Notice that the last sample, LC_C_4, has a rather high proportion of failed probes, which might affect the downstream analysis.  
+According to the `champ.filter()` criteria, there are some probes being filtered out:   
+1. A detection p-value above 0.01: **42312** probes  
+2. A beadcount <3 in at least 5% of samples: **9046** probes  
+3. non-CpG probes: **2406** probes  
+4. Probes with SNPs using general EPIC SNP list according to Zhou's Nucleic Acids Research Paper 2016: **93441** probes  
+5. Probes that align to multiple locations that identified in Nordlund et al: **11** probes  
+6. Probes located on X,Y chromosome: **15885** probes  
+
+There are a total of **702817** probes remained after filtering. 
+
+#### Quality control and Normalization
+```{r, cache=TRUE, out.width="50%"}
+champ.QC(PDFplot = FALSE)
+```
+
+The beta value distribution of LC_C_4 in the density plot, which is quite different from the others, may be caused by the high proportional of failed probes.
+
+```{r, cache=TRUE}
+myNorm <- champ.norm(arraytype = "EPIC", cores = 5)
+```
+
+The default method of normalization is [BMIQ](https://pubmed.ncbi.nlm.nih.gov/23175756/).
+
+```{r, out.width="50%", cache=TRUE}
+champ.QC(beta = myNorm, PDFplot = FALSE)
+```
+ 
+#### Singular value decomposition and batch effect correction
+To see if the variation of the data comes from any technical sources besides the biological factors of our interest, a SVD test is performed.
+ 
+```{r, cache=TRUE, out.width="50%"}
+myNorm <- as.data.frame(myNorm)
+champ.SVD(PDFplot = FALSE)
+```
+
+It shows that after deconvolution, the first 2 components captured about 80% of variance. In concordance with the SVD analysis plot, implying that there is a minor need to deal with batch effects. It is reasonable since eight samples are all on the same slide.   
+
+#### Identification of defferential methylation probes
+```{r, cache=TRUE, error=TRUE}
+champ.DMP(arraytype = "EPIC")
+```
+
+It turns out that there are no significant CpGs detected.  
+To see if the result is caused by the inclusion of the sample with poor quality (i.e. LC_C_4), LC_C_4 is excluded from the data and the analysis is re-performed.
